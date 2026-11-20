@@ -1,0 +1,1115 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0d6b63">
+  <title>航班比价记录器</title>
+  <style>
+    /* ---------- Theme & reset ---------- */
+    :root {
+      --ink: #172523;
+      --muted: #667775;
+      --surface: #ffffff;
+      --surface-soft: #f4f8f7;
+      --canvas: #edf4f2;
+      --line: #dbe7e4;
+      --brand: #0d6b63;
+      --brand-dark: #084d48;
+      --brand-pale: #dff2ef;
+      --accent: #ef8354;
+      --danger: #b53b48;
+      --shadow: 0 10px 30px rgba(22, 63, 58, .09);
+      --radius: 20px;
+      --red: #e05260;
+      --orange: #eb8a37;
+      --green: #33a06f;
+      --blue: #3f7fd7;
+      --purple: #8c63c7;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { color-scheme: light; scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      min-height: 100vh;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 8% 2%, rgba(95, 180, 163, .14), transparent 28rem),
+        var(--canvas);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button, input, select, textarea { font: inherit; }
+    button { -webkit-tap-highlight-color: transparent; }
+    button, select, input[type="checkbox"] { cursor: pointer; }
+    button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+      outline: 3px solid rgba(13, 107, 99, .22);
+      outline-offset: 2px;
+    }
+
+    .shell { width: min(1180px, 100%); margin-inline: auto; padding: 0 16px 44px; }
+
+    /* ---------- Header ---------- */
+    .topbar {
+      position: sticky;
+      z-index: 20;
+      top: 0;
+      margin: 0 -16px;
+      padding: max(12px, env(safe-area-inset-top)) 16px 12px;
+      background: rgba(237, 244, 242, .91);
+      border-bottom: 1px solid rgba(205, 220, 216, .72);
+      backdrop-filter: blur(14px);
+    }
+
+    .topbar-inner {
+      width: min(1148px, 100%);
+      margin-inline: auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .brand-mark {
+      width: 42px;
+      height: 42px;
+      flex: 0 0 42px;
+      display: grid;
+      place-items: center;
+      color: white;
+      border-radius: 14px;
+      background: linear-gradient(145deg, var(--brand), #249083);
+      box-shadow: 0 7px 18px rgba(13, 107, 99, .24);
+      font-size: 21px;
+      transform: rotate(-3deg);
+    }
+
+    .brand-text { min-width: 0; }
+    .brand-text h1 { margin: 0; font-size: clamp(17px, 4.7vw, 22px); line-height: 1.15; letter-spacing: -.02em; }
+    .brand-text p { display: none; margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+
+    .header-actions { display: flex; gap: 8px; flex: 0 0 auto; }
+    .btn {
+      min-height: 42px;
+      border: 0;
+      border-radius: 12px;
+      padding: 9px 14px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      color: var(--ink);
+      background: #fff;
+      box-shadow: inset 0 0 0 1px var(--line);
+      font-weight: 700;
+      transition: transform .16s ease, background .16s ease, box-shadow .16s ease;
+    }
+    .btn:hover { background: #f9fbfa; box-shadow: inset 0 0 0 1px #bfd3cf; }
+    .btn:active { transform: translateY(1px); }
+    .btn-primary { color: #fff; background: var(--brand); box-shadow: none; }
+    .btn-primary:hover { background: var(--brand-dark); box-shadow: none; }
+    .btn-danger { color: var(--danger); }
+    .btn-danger:hover { background: #fff4f5; box-shadow: inset 0 0 0 1px #efc8ce; }
+    .btn:disabled { cursor: not-allowed; opacity: .45; transform: none; }
+    .btn-icon { width: 42px; padding-inline: 0; }
+    .btn-label-optional { display: none; }
+    .plus { font-size: 20px; line-height: 1; margin-top: -2px; }
+
+    /* ---------- Intro & tools ---------- */
+    .intro {
+      padding: 27px 2px 17px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .eyebrow { color: var(--brand); font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    .intro h2 { margin: 6px 0 6px; font-size: clamp(25px, 7vw, 38px); line-height: 1.1; letter-spacing: -.045em; }
+    .intro p { margin: 0; max-width: 590px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+    .stat { display: none; text-align: right; }
+    .stat strong { display: block; font-size: 30px; color: var(--brand); line-height: 1; }
+    .stat span { color: var(--muted); font-size: 12px; }
+
+    .toolbar {
+      position: relative;
+      z-index: 2;
+      padding: 12px;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      background: rgba(255,255,255,.88);
+      border: 1px solid rgba(214, 228, 224, .9);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+    }
+
+    .control { position: relative; min-width: 0; }
+    .control-icon {
+      position: absolute;
+      left: 13px;
+      top: 50%;
+      z-index: 1;
+      transform: translateY(-50%);
+      color: #71827f;
+      pointer-events: none;
+    }
+    .control input, .control select {
+      width: 100%;
+      height: 44px;
+      padding: 0 38px;
+      color: var(--ink);
+      background: var(--surface-soft);
+      border: 1px solid transparent;
+      border-radius: 12px;
+      outline: none;
+    }
+    .control input:hover, .control select:hover { border-color: #cbdcd8; }
+    .control input:focus, .control select:focus { background: #fff; border-color: var(--brand); }
+    .control select { appearance: none; padding-right: 36px; }
+    .select-arrow { left: auto; right: 13px; font-size: 11px; }
+    .clear-filter {
+      position: absolute;
+      right: 7px;
+      top: 6px;
+      width: 32px;
+      height: 32px;
+      border: 0;
+      display: none;
+      place-items: center;
+      color: var(--muted);
+      background: transparent;
+      border-radius: 9px;
+    }
+    .clear-filter.visible { display: grid; }
+    .compare-btn { width: 100%; }
+    .count-badge {
+      min-width: 20px;
+      height: 20px;
+      padding-inline: 5px;
+      display: inline-grid;
+      place-items: center;
+      color: var(--brand);
+      background: white;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    /* ---------- Comparison ---------- */
+    .compare-panel {
+      margin-top: 16px;
+      overflow: hidden;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      animation: reveal .24s ease;
+    }
+    .compare-panel[hidden] { display: none; }
+    @keyframes reveal { from { opacity: 0; transform: translateY(-8px); } }
+    .compare-head {
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+    .compare-title { margin: 0; font-size: 17px; }
+    .compare-tip { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+    .close-btn {
+      width: 36px;
+      height: 36px;
+      flex: 0 0 auto;
+      border: 0;
+      border-radius: 10px;
+      color: var(--muted);
+      background: var(--surface-soft);
+      font-size: 20px;
+    }
+    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .compare-table { width: 100%; min-width: 560px; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+    .compare-table th, .compare-table td { min-width: 156px; padding: 13px 14px; text-align: left; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .compare-table thead th { color: var(--brand-dark); background: #edf8f6; font-size: 13px; }
+    .compare-table th:first-child, .compare-table tbody th {
+      position: sticky;
+      left: 0;
+      z-index: 2;
+      min-width: 85px;
+      width: 85px;
+      color: var(--muted);
+      background: #f8faf9;
+      font-weight: 700;
+    }
+    .compare-table thead th:first-child { z-index: 3; }
+    .compare-table tr:last-child > * { border-bottom: 0; }
+    .compare-table tr > *:last-child { border-right: 0; }
+    .price-low { color: #148050; background: #effaf4; font-weight: 900; }
+    .price-high { color: #b43b49; background: #fff4f5; font-weight: 900; }
+
+    /* ---------- Card list ---------- */
+    .list-heading { margin: 24px 2px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .list-heading h2 { margin: 0; font-size: 16px; }
+    .list-heading span { color: var(--muted); font-size: 12px; }
+    .flight-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
+
+    .flight-card {
+      --highlight: transparent;
+      position: relative;
+      overflow: hidden;
+      padding: 17px 16px 14px 20px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: 0 6px 20px rgba(25, 61, 57, .06);
+      transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
+    }
+    .flight-card::before {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 6px;
+      background: var(--highlight);
+    }
+    .flight-card:hover { transform: translateY(-2px); box-shadow: 0 13px 28px rgba(25, 61, 57, .10); }
+    .flight-card.is-checked { background: linear-gradient(135deg, #f1faf9 0%, #fff 62%); border-color: #a8d3cc; }
+    .flight-card[data-highlight="red"] { --highlight: var(--red); }
+    .flight-card[data-highlight="orange"] { --highlight: var(--orange); }
+    .flight-card[data-highlight="green"] { --highlight: var(--green); }
+    .flight-card[data-highlight="blue"] { --highlight: var(--blue); }
+    .flight-card[data-highlight="purple"] { --highlight: var(--purple); }
+
+    .card-top { display: flex; align-items: center; gap: 11px; }
+    .airline-logo {
+      width: 42px;
+      height: 42px;
+      flex: 0 0 42px;
+      display: grid;
+      place-items: center;
+      color: var(--brand-dark);
+      background: var(--brand-pale);
+      border-radius: 13px;
+      font-size: 15px;
+      font-weight: 900;
+    }
+    .airline-info { min-width: 0; flex: 1; }
+    .airline-info h3 { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; }
+    .airline-info p { margin: 3px 0 0; color: var(--muted); font-size: 11px; }
+    .card-price { flex: 0 0 auto; color: var(--accent); font-size: 22px; font-weight: 900; letter-spacing: -.04em; }
+    .card-price small { margin-right: 2px; font-size: 12px; font-weight: 800; }
+
+    .route { margin: 18px 0 15px; display: grid; grid-template-columns: minmax(72px, auto) 1fr minmax(72px, auto); align-items: center; gap: 10px; }
+    .route-time:last-child { text-align: right; }
+    .time { display: block; font-size: 22px; font-weight: 850; line-height: 1; letter-spacing: -.025em; }
+    .date { display: block; margin-top: 6px; color: var(--muted); font-size: 11px; }
+    .route-line { min-width: 50px; display: flex; align-items: center; color: var(--brand); }
+    .route-line::before, .route-line::after { content: ""; height: 1px; flex: 1; background: #bdd4d0; }
+    .route-plane { padding: 0 7px; font-size: 16px; transform: translateY(-1px); }
+
+    .facts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .fact { padding: 10px 11px; min-width: 0; background: var(--surface-soft); border-radius: 11px; }
+    .fact-label { display: block; margin-bottom: 3px; color: var(--muted); font-size: 10px; }
+    .fact-value { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 750; }
+    .remarks { margin: 11px 1px 0; color: #52615f; font-size: 12px; line-height: 1.55; display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .remarks::before { content: "备注："; color: var(--muted); }
+
+    .card-actions { margin-top: 15px; padding-top: 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; border-top: 1px solid #e7eeec; }
+    .check-label { order: 1; margin-right: auto; display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .check-label input { width: 19px; height: 19px; margin: 0; accent-color: var(--brand); }
+    .color-picker { order: 4; width: 100%; display: flex; align-items: center; justify-content: flex-end; gap: 7px; }
+    .color-picker::before { content: "高亮标记"; margin-right: auto; color: var(--muted); font-size: 10px; font-weight: 700; }
+    .color-dot {
+      width: 20px;
+      height: 20px;
+      padding: 0;
+      border: 3px solid #fff;
+      border-radius: 50%;
+      box-shadow: 0 0 0 1px #c9d5d2;
+      transition: transform .15s ease, box-shadow .15s ease;
+    }
+    .color-dot:hover { transform: scale(1.13); }
+    .color-dot.active { box-shadow: 0 0 0 2px var(--ink); transform: scale(1.08); }
+    .color-dot[data-color="red"] { background: var(--red); }
+    .color-dot[data-color="orange"] { background: var(--orange); }
+    .color-dot[data-color="green"] { background: var(--green); }
+    .color-dot[data-color="blue"] { background: var(--blue); }
+    .color-dot[data-color="purple"] { background: var(--purple); }
+    .mini-btn { order: 2; height: 32px; padding: 0 9px; border: 0; border-radius: 9px; color: var(--muted); background: var(--surface-soft); font-size: 12px; font-weight: 700; }
+    .mini-btn:hover { color: var(--brand-dark); background: var(--brand-pale); }
+    .mini-btn.delete:hover { color: var(--danger); background: #fff0f2; }
+
+    .empty {
+      padding: 52px 20px;
+      grid-column: 1 / -1;
+      text-align: center;
+      background: rgba(255,255,255,.65);
+      border: 1px dashed #b9cfca;
+      border-radius: var(--radius);
+    }
+    .empty-icon { width: 58px; height: 58px; margin: 0 auto 14px; display: grid; place-items: center; color: var(--brand); background: var(--brand-pale); border-radius: 20px; font-size: 26px; }
+    .empty h3 { margin: 0 0 7px; font-size: 17px; }
+    .empty p { margin: 0 0 18px; color: var(--muted); font-size: 13px; }
+
+    /* ---------- Modal form ---------- */
+    .modal {
+      position: fixed;
+      z-index: 100;
+      inset: 0;
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      padding: 0;
+      background: rgba(7, 28, 26, .54);
+      backdrop-filter: blur(5px);
+    }
+    .modal.open { display: flex; animation: fadeIn .18s ease; }
+    @keyframes fadeIn { from { opacity: 0; } }
+    .modal-card {
+      width: 100%;
+      max-height: 92vh;
+      overflow-y: auto;
+      padding: 0 18px max(20px, env(safe-area-inset-bottom));
+      background: var(--surface);
+      border-radius: 24px 24px 0 0;
+      box-shadow: 0 -16px 50px rgba(0,0,0,.18);
+      animation: slideUp .26s ease;
+    }
+    @keyframes slideUp { from { transform: translateY(30px); opacity: .7; } }
+    .modal-handle { width: 42px; height: 5px; margin: 10px auto 4px; background: #d7e1df; border-radius: 99px; }
+    .modal-head {
+      position: sticky;
+      z-index: 3;
+      top: 0;
+      margin: 0 -2px;
+      padding: 14px 2px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(255,255,255,.96);
+    }
+    .modal-head h2 { margin: 0; font-size: 20px; }
+    .modal-head p { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
+    .form-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
+    .field { min-width: 0; }
+    .field.full { grid-column: 1 / -1; }
+    .field label { display: block; margin: 0 0 7px 2px; color: #3b4d4a; font-size: 12px; font-weight: 800; }
+    .required { color: var(--danger); }
+    .field input, .field textarea {
+      width: 100%;
+      min-height: 46px;
+      padding: 11px 12px;
+      color: var(--ink);
+      background: var(--surface-soft);
+      border: 1px solid #dbe5e3;
+      border-radius: 12px;
+      outline: none;
+      cursor: text;
+    }
+    .field input:focus, .field textarea:focus { background: #fff; border-color: var(--brand); box-shadow: 0 0 0 3px rgba(13,107,99,.09); }
+    .field textarea { min-height: 82px; resize: vertical; line-height: 1.5; }
+    .arrival-wrap { display: flex; gap: 7px; }
+    .arrival-wrap input { min-width: 0; }
+    .calc-btn { width: 46px; flex: 0 0 46px; padding: 0; border: 1px solid #cce0dc; border-radius: 12px; color: var(--brand); background: var(--brand-pale); font-size: 17px; }
+    .field-hint { display: block; min-height: 16px; margin: 5px 2px 0; color: var(--muted); font-size: 10px; }
+    .field-hint.error { color: var(--danger); }
+    .form-actions {
+      position: sticky;
+      bottom: 0;
+      margin: 18px -2px 0;
+      padding: 12px 2px 0;
+      display: grid;
+      grid-template-columns: .7fr 1.3fr;
+      gap: 9px;
+      background: linear-gradient(transparent 0, white 12px);
+    }
+
+    /* ---------- Toast ---------- */
+    .toast {
+      position: fixed;
+      z-index: 200;
+      left: 50%;
+      bottom: max(22px, env(safe-area-inset-bottom));
+      max-width: calc(100% - 32px);
+      padding: 11px 16px;
+      color: #fff;
+      background: #193c38;
+      border-radius: 12px;
+      box-shadow: 0 12px 30px rgba(0,0,0,.2);
+      font-size: 13px;
+      font-weight: 700;
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(-50%, 15px);
+      transition: opacity .2s ease, transform .2s ease;
+    }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    body.modal-open { overflow: hidden; }
+
+    /* ---------- Larger screens and landscape ---------- */
+    @media (max-width: 379px) {
+      .btn-label-add { display: none; }
+      #addFlightBtn { width: 42px; padding-inline: 0; }
+    }
+
+    @media (min-width: 620px) {
+      .shell { padding-inline: 22px; }
+      .topbar { margin-inline: -22px; padding-inline: 22px; }
+      .brand-text p, .btn-label-optional, .stat { display: block; }
+      .btn-icon { width: auto; padding-inline: 14px; }
+      .toolbar { grid-template-columns: minmax(180px, 1fr) minmax(210px, 1.3fr) auto; }
+      .compare-btn { width: auto; min-width: 130px; }
+      .flight-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .modal { align-items: center; padding: 24px; }
+      .modal-card { width: min(690px, 100%); max-height: min(88vh, 760px); border-radius: 24px; padding: 0 24px 24px; }
+      .modal-handle { display: none; }
+      .modal-head { padding-top: 22px; }
+      .form-grid { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (min-width: 1000px) {
+      .flight-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+
+    @media (orientation: landscape) and (max-height: 620px) {
+      .topbar { position: relative; }
+      .intro { padding-top: 18px; }
+      .flight-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .modal { align-items: center; padding: 14px; }
+      .modal-card { width: min(800px, 94vw); max-height: 94vh; border-radius: 22px; padding: 0 22px 18px; }
+      .modal-handle { display: none; }
+      .modal-head { padding-top: 15px; }
+      .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; }
+      .field textarea { min-height: 58px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">✈</div>
+          <div class="brand-text">
+            <h1>航班比价</h1>
+            <p>把心仪航班放在一起看</p>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-danger btn-icon" id="clearAllBtn" type="button" title="清空所有记录">
+            <span aria-hidden="true">⌫</span><span class="btn-label-optional">清空数据</span>
+          </button>
+          <button class="btn btn-primary" id="addFlightBtn" type="button" aria-label="添加航班">
+            <span class="plus" aria-hidden="true">＋</span><span class="btn-label-add">添加航班</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="intro" aria-labelledby="pageTitle">
+        <div>
+          <div class="eyebrow">TRIP SHORTLIST</div>
+          <h2 id="pageTitle">选一程，更称心的旅途</h2>
+          <p>记录价格、时间和行李额度，勾选心仪方案后一键横向比较。</p>
+        </div>
+        <div class="stat" aria-live="polite">
+          <strong id="totalCount">0</strong>
+          <span>条航班记录</span>
+        </div>
+      </section>
+
+      <section class="toolbar" aria-label="排序和筛选工具">
+        <div class="control">
+          <span class="control-icon" aria-hidden="true">↕</span>
+          <label class="sr-only" for="sortSelect">排序方式</label>
+          <select id="sortSelect">
+            <option value="priceAsc">价格：低到高</option>
+            <option value="priceDesc">价格：高到低</option>
+            <option value="departureAsc">起飞：早到晚</option>
+            <option value="departureDesc">起飞：晚到早</option>
+          </select>
+          <span class="control-icon select-arrow" aria-hidden="true">▼</span>
+        </div>
+        <div class="control">
+          <span class="control-icon" aria-hidden="true">⌕</span>
+          <label class="sr-only" for="filterInput">按航司筛选</label>
+          <input id="filterInput" type="search" placeholder="输入航司或航班号筛选" autocomplete="off">
+          <button class="clear-filter" id="clearFilterBtn" type="button" aria-label="清除筛选">×</button>
+        </div>
+        <button class="btn btn-primary compare-btn" id="compareBtn" type="button" disabled>
+          <span aria-hidden="true">▦</span> 比价
+          <span class="count-badge" id="checkedCount">0</span>
+        </button>
+      </section>
+
+      <section class="compare-panel" id="comparePanel" aria-labelledby="compareTitle" hidden>
+        <div class="compare-head">
+          <div>
+            <h2 class="compare-title" id="compareTitle">已选航班对比</h2>
+            <p class="compare-tip">左右滑动查看全部，绿色为最低价，红色为最高价</p>
+          </div>
+          <button class="close-btn" id="closeCompareBtn" type="button" aria-label="关闭比价">×</button>
+        </div>
+        <div class="table-scroll" id="compareTableWrap"></div>
+      </section>
+
+      <div class="list-heading">
+        <h2>航班清单</h2>
+        <span id="visibleCount">显示 0 条</span>
+      </div>
+      <section class="flight-grid" id="flightList" aria-live="polite" aria-label="航班记录列表"></section>
+    </main>
+  </div>
+
+  <!-- 添加/编辑表单：手机上为底部抽屉，宽屏上为居中弹窗 -->
+  <div class="modal" id="flightModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-hidden="true">
+    <div class="modal-card">
+      <div class="modal-handle" aria-hidden="true"></div>
+      <div class="modal-head">
+        <div>
+          <h2 id="modalTitle">添加航班</h2>
+          <p id="modalSubtitle">填写行程信息，带 <span class="required">*</span> 为必填项</p>
+        </div>
+        <button class="close-btn" id="closeModalBtn" type="button" aria-label="关闭表单">×</button>
+      </div>
+
+      <form id="flightForm" novalidate>
+        <input type="hidden" id="flightId">
+        <div class="form-grid">
+          <div class="field">
+            <label for="departure">起飞日期时间 <span class="required">*</span></label>
+            <input id="departure" name="departure" type="datetime-local" required>
+          </div>
+          <div class="field">
+            <label for="duration">总行程时间 <span class="required">*</span></label>
+            <input id="duration" name="duration" type="text" placeholder="例如 2h 30m" maxlength="30" required>
+            <small class="field-hint" id="durationHint">支持 2h30m、150m 或 2小时30分</small>
+          </div>
+          <div class="field">
+            <label for="arrival">到达日期时间 <span class="required">*</span></label>
+            <div class="arrival-wrap">
+              <input id="arrival" name="arrival" type="datetime-local" required>
+              <button class="calc-btn" id="calcArrivalBtn" type="button" title="根据起飞时间和时长重新计算" aria-label="重新计算到达时间">↻</button>
+            </div>
+            <small class="field-hint">可自动计算，也可以手动修改</small>
+          </div>
+          <div class="field">
+            <label for="price">价格（元） <span class="required">*</span></label>
+            <input id="price" name="price" type="number" min="0" step="1" inputmode="decimal" placeholder="例如 1250" required>
+          </div>
+          <div class="field">
+            <label for="airline">航司信息 <span class="required">*</span></label>
+            <input id="airline" name="airline" type="text" placeholder="例如 中国国航 CA1234" maxlength="80" required>
+          </div>
+          <div class="field">
+            <label for="baggage">行李额度 <span class="required">*</span></label>
+            <input id="baggage" name="baggage" type="text" placeholder="例如 1件 23kg" maxlength="60" required>
+          </div>
+          <div class="field full">
+            <label for="remarks">备注（可选）</label>
+            <textarea id="remarks" name="remarks" placeholder="餐食、退改政策、座位等信息" maxlength="300"></textarea>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn" id="cancelFormBtn" type="button">取消</button>
+          <button class="btn btn-primary" type="submit">保存航班</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    (() => {
+      'use strict';
+
+      const STORAGE_KEY = 'flight-comparison-recorder-v1';
+      const COLORS = ['red', 'orange', 'green', 'blue', 'purple'];
+
+      // 首次访问时使用的演示数据；清空后会保存空数组，因此不会重复注入。
+      const SAMPLE_FLIGHTS = [
+        { id: 'sample-mu5101', departure: '2026-09-10T08:30', duration: '2h 30m', arrival: '2026-09-10T11:00', price: 1250, airline: '东航 MU5101', baggage: '1件 23kg', remarks: '含早', checked: false, highlight: 'blue' },
+        { id: 'sample-cz3502', departure: '2026-09-10T09:00', duration: '3h 20m', arrival: '2026-09-10T12:20', price: 980, airline: '南航 CZ3502', baggage: '1件 20kg', remarks: '无餐食', checked: true, highlight: 'green' },
+        { id: 'sample-ca987', departure: '2026-09-10T14:15', duration: '2h 30m', arrival: '2026-09-10T16:45', price: 1580, airline: '国航 CA987', baggage: '2件 23kg', remarks: '优选座位', checked: false, highlight: 'purple' },
+        { id: 'sample-hu771', departure: '2026-09-10T18:00', duration: '4h 10m', arrival: '2026-09-10T22:10', price: 760, airline: '海航 HU771', baggage: '1件 15kg', remarks: '廉价航空', checked: true, highlight: 'orange' }
+      ];
+
+      const $ = (selector, root = document) => root.querySelector(selector);
+      const refs = {
+        list: $('#flightList'),
+        sort: $('#sortSelect'),
+        filter: $('#filterInput'),
+        clearFilter: $('#clearFilterBtn'),
+        compareBtn: $('#compareBtn'),
+        checkedCount: $('#checkedCount'),
+        comparePanel: $('#comparePanel'),
+        compareWrap: $('#compareTableWrap'),
+        closeCompare: $('#closeCompareBtn'),
+        totalCount: $('#totalCount'),
+        visibleCount: $('#visibleCount'),
+        addBtn: $('#addFlightBtn'),
+        clearAllBtn: $('#clearAllBtn'),
+        modal: $('#flightModal'),
+        closeModal: $('#closeModalBtn'),
+        cancelForm: $('#cancelFormBtn'),
+        form: $('#flightForm'),
+        modalTitle: $('#modalTitle'),
+        flightId: $('#flightId'),
+        departure: $('#departure'),
+        duration: $('#duration'),
+        durationHint: $('#durationHint'),
+        arrival: $('#arrival'),
+        price: $('#price'),
+        airline: $('#airline'),
+        baggage: $('#baggage'),
+        remarks: $('#remarks'),
+        calcArrival: $('#calcArrivalBtn'),
+        toast: $('#toast')
+      };
+
+      let flights = loadFlights();
+      let comparisonOpen = false;
+      let arrivalManuallyEdited = false;
+      let lastFocusedElement = null;
+      let toastTimer = null;
+
+      function loadFlights() {
+        let raw = null;
+        try {
+          raw = localStorage.getItem(STORAGE_KEY);
+        } catch (error) {
+          console.warn('浏览器禁止访问本地存储，将临时使用示例数据：', error);
+          return SAMPLE_FLIGHTS.map(item => ({ ...item }));
+        }
+        if (raw === null) {
+          const seeded = SAMPLE_FLIGHTS.map(item => ({ ...item }));
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(seeded));
+          } catch (error) {
+            console.warn('无法写入初始示例数据：', error);
+          }
+          return seeded;
+        }
+        try {
+          const parsed = JSON.parse(raw);
+          return Array.isArray(parsed) ? parsed.map(normalizeFlight).filter(Boolean) : [];
+        } catch (error) {
+          console.warn('无法读取已保存的航班数据：', error);
+          return [];
+        }
+      }
+
+      function normalizeFlight(item) {
+        if (!item || typeof item !== 'object') return null;
+        return {
+          id: String(item.id || createId()),
+          departure: String(item.departure || ''),
+          duration: String(item.duration || ''),
+          arrival: String(item.arrival || ''),
+          price: Number(item.price) || 0,
+          airline: String(item.airline || '未命名航班'),
+          baggage: String(item.baggage || '未填写'),
+          remarks: String(item.remarks || ''),
+          checked: Boolean(item.checked),
+          highlight: COLORS.includes(item.highlight) ? item.highlight : null
+        };
+      }
+
+      function saveFlights() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(flights));
+        } catch (error) {
+          showToast('保存失败，请检查浏览器存储权限');
+          console.warn('保存航班数据失败：', error);
+        }
+      }
+
+      function createId() {
+        if (window.crypto && typeof window.crypto.randomUUID === 'function') return crypto.randomUUID();
+        return `flight-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      }
+
+      // 所有进入 innerHTML 的用户输入都先转义。
+      function escapeHTML(value) {
+        return String(value ?? '').replace(/[&<>'"]/g, char => ({
+          '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+        })[char]);
+      }
+
+      function parseLocalDate(value) {
+        if (!value) return null;
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? null : date;
+      }
+
+      function formatDateParts(value) {
+        const date = parseLocalDate(value);
+        if (!date) return { time: '--:--', date: '日期未填写', full: '未填写' };
+        const pad = number => String(number).padStart(2, '0');
+        const time = `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+        const dateText = `${date.getMonth() + 1}月${date.getDate()}日`;
+        const full = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${time}`;
+        return { time, date: dateText, full };
+      }
+
+      function priceText(value) {
+        return Number(value).toLocaleString('zh-CN', { maximumFractionDigits: 2 });
+      }
+
+      function airlineMonogram(airline) {
+        const flightCode = String(airline).match(/\b([A-Z0-9]{2})\s*\d/i);
+        if (flightCode) return flightCode[1].toUpperCase();
+        const compact = String(airline).trim();
+        return compact.slice(0, 1).toUpperCase() || '✈';
+      }
+
+      function splitAirline(airline) {
+        const text = String(airline).trim();
+        const match = text.match(/^(.*?)([A-Z0-9]{2}\s*\d{2,5}[A-Z]?)$/i);
+        if (!match) return { name: text, code: '航班记录' };
+        return { name: match[1].trim() || text, code: match[2].replace(/\s+/g, '') };
+      }
+
+      function getVisibleFlights() {
+        const keyword = refs.filter.value.trim().toLocaleLowerCase('zh-CN');
+        const filtered = flights.filter(item => !keyword || item.airline.toLocaleLowerCase('zh-CN').includes(keyword));
+        const sorters = {
+          priceAsc: (a, b) => a.price - b.price,
+          priceDesc: (a, b) => b.price - a.price,
+          departureAsc: (a, b) => (parseLocalDate(a.departure)?.getTime() || 0) - (parseLocalDate(b.departure)?.getTime() || 0),
+          departureDesc: (a, b) => (parseLocalDate(b.departure)?.getTime() || 0) - (parseLocalDate(a.departure)?.getTime() || 0)
+        };
+        return [...filtered].sort(sorters[refs.sort.value] || sorters.priceAsc);
+      }
+
+      function render() {
+        const visible = getVisibleFlights();
+        const checked = flights.filter(item => item.checked);
+
+        refs.totalCount.textContent = flights.length;
+        refs.visibleCount.textContent = `显示 ${visible.length} 条${visible.length !== flights.length ? ` / 共 ${flights.length} 条` : ''}`;
+        refs.checkedCount.textContent = checked.length;
+        refs.compareBtn.disabled = checked.length < 2;
+        refs.clearAllBtn.disabled = flights.length === 0;
+
+        if (comparisonOpen && checked.length < 2) comparisonOpen = false;
+        refs.comparePanel.hidden = !comparisonOpen;
+        if (comparisonOpen) renderComparison(checked);
+
+        if (!visible.length) {
+          const filtered = Boolean(refs.filter.value.trim());
+          refs.list.innerHTML = `
+            <div class="empty">
+              <div class="empty-icon" aria-hidden="true">${filtered ? '⌕' : '✈'}</div>
+              <h3>${filtered ? '没有找到匹配航班' : '还没有航班记录'}</h3>
+              <p>${filtered ? '换个航司名称或航班号试试' : '添加第一条航班，开始轻松比价'}</p>
+              <button class="btn btn-primary" type="button" data-action="${filtered ? 'clear-filter' : 'add'}">
+                ${filtered ? '清除筛选' : '＋ 添加航班'}
+              </button>
+            </div>`;
+          return;
+        }
+
+        refs.list.innerHTML = visible.map(cardTemplate).join('');
+      }
+
+      function cardTemplate(flight) {
+        const departure = formatDateParts(flight.departure);
+        const arrival = formatDateParts(flight.arrival);
+        const airline = splitAirline(flight.airline);
+        const dots = COLORS.map(color => `
+          <button class="color-dot ${flight.highlight === color ? 'active' : ''}" type="button"
+            data-action="highlight" data-color="${color}" aria-label="${color} 高亮${flight.highlight === color ? '（已选）' : ''}"
+            aria-pressed="${flight.highlight === color}"></button>`).join('');
+
+        return `
+          <article class="flight-card ${flight.checked ? 'is-checked' : ''}" data-id="${escapeHTML(flight.id)}" data-highlight="${flight.highlight || ''}">
+            <div class="card-top">
+              <div class="airline-logo" aria-hidden="true">${escapeHTML(airlineMonogram(flight.airline))}</div>
+              <div class="airline-info">
+                <h3 title="${escapeHTML(flight.airline)}">${escapeHTML(airline.name)}</h3>
+                <p>${escapeHTML(airline.code)}</p>
+              </div>
+              <div class="card-price"><small>¥</small>${priceText(flight.price)}</div>
+            </div>
+            <div class="route" aria-label="${departure.full} 起飞，${arrival.full} 到达">
+              <div class="route-time"><span class="time">${departure.time}</span><span class="date">${departure.date}</span></div>
+              <div class="route-line"><span class="route-plane" aria-hidden="true">✈</span></div>
+              <div class="route-time"><span class="time">${arrival.time}</span><span class="date">${arrival.date}</span></div>
+            </div>
+            <div class="facts">
+              <div class="fact"><span class="fact-label">总行程时间</span><span class="fact-value">◷ ${escapeHTML(flight.duration)}</span></div>
+              <div class="fact"><span class="fact-label">行李额度</span><span class="fact-value">▣ ${escapeHTML(flight.baggage)}</span></div>
+            </div>
+            ${flight.remarks ? `<p class="remarks" title="${escapeHTML(flight.remarks)}">${escapeHTML(flight.remarks)}</p>` : ''}
+            <div class="card-actions">
+              <label class="check-label">
+                <input type="checkbox" data-action="check" ${flight.checked ? 'checked' : ''}>
+                <span>${flight.checked ? '已关注' : '待比较'}</span>
+              </label>
+              <div class="color-picker" aria-label="选择高亮颜色">${dots}</div>
+              <button class="mini-btn" type="button" data-action="edit">编辑</button>
+              <button class="mini-btn delete" type="button" data-action="delete">删除</button>
+            </div>
+          </article>`;
+      }
+
+      function renderComparison(selected) {
+        const prices = selected.map(item => Number(item.price));
+        const min = Math.min(...prices);
+        const max = Math.max(...prices);
+        const row = (label, formatter, classFor = () => '') => `
+          <tr><th scope="row">${label}</th>${selected.map(item => `<td class="${classFor(item)}">${formatter(item)}</td>`).join('')}</tr>`;
+
+        refs.compareWrap.innerHTML = `
+          <table class="compare-table">
+            <thead><tr><th scope="col">对比项</th>${selected.map(item => `<th scope="col">${escapeHTML(item.airline)}</th>`).join('')}</tr></thead>
+            <tbody>
+              ${row('航司', item => escapeHTML(item.airline))}
+              ${row('起飞', item => escapeHTML(formatDateParts(item.departure).full))}
+              ${row('到达', item => escapeHTML(formatDateParts(item.arrival).full))}
+              ${row('时长', item => escapeHTML(item.duration))}
+              ${row('价格', item => `¥${priceText(item.price)}`, item => min === max ? 'price-low' : item.price === min ? 'price-low' : item.price === max ? 'price-high' : '')}
+              ${row('行李', item => escapeHTML(item.baggage))}
+              ${row('备注', item => escapeHTML(item.remarks || '—'))}
+            </tbody>
+          </table>`;
+      }
+
+      function showToast(message) {
+        refs.toast.textContent = message;
+        refs.toast.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => refs.toast.classList.remove('show'), 2200);
+      }
+
+      function openModal(flight = null) {
+        lastFocusedElement = document.activeElement;
+        refs.form.reset();
+        refs.flightId.value = flight?.id || '';
+        refs.modalTitle.textContent = flight ? '编辑航班' : '添加航班';
+        refs.departure.value = flight?.departure || '';
+        refs.duration.value = flight?.duration || '';
+        refs.arrival.value = flight?.arrival || '';
+        refs.price.value = flight?.price ?? '';
+        refs.airline.value = flight?.airline || '';
+        refs.baggage.value = flight?.baggage || '';
+        refs.remarks.value = flight?.remarks || '';
+        refs.durationHint.textContent = '支持 2h30m、150m 或 2小时30分';
+        refs.durationHint.classList.remove('error');
+        arrivalManuallyEdited = Boolean(flight);
+        refs.modal.classList.add('open');
+        refs.modal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('modal-open');
+        setTimeout(() => refs.departure.focus(), 30);
+      }
+
+      function closeModal() {
+        refs.modal.classList.remove('open');
+        refs.modal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('modal-open');
+        if (lastFocusedElement && typeof lastFocusedElement.focus === 'function') lastFocusedElement.focus();
+      }
+
+      // 接受 2h 30m、2h30m、150m、2小时30分、2小时 等常用写法。
+      function parseDurationMinutes(input) {
+        const text = String(input).trim().toLowerCase().replace(/\s+/g, '');
+        if (!text) return null;
+        if (/^\d+(?:\.\d+)?$/.test(text)) return Math.round(Number(text) * 60);
+        const hours = text.match(/(\d+(?:\.\d+)?)\s*(?:h|hr|hrs|小时)/i);
+        const minutes = text.match(/(\d+)\s*(?:m|min|mins|分钟|分)(?![a-z])/i);
+        if (!hours && !minutes) return null;
+        return Math.round((hours ? Number(hours[1]) * 60 : 0) + (minutes ? Number(minutes[1]) : 0));
+      }
+
+      function toDatetimeLocal(date) {
+        const pad = number => String(number).padStart(2, '0');
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+      }
+
+      function calculateArrival(force = false) {
+        if (arrivalManuallyEdited && !force) return false;
+        const departure = parseLocalDate(refs.departure.value);
+        const minutes = parseDurationMinutes(refs.duration.value);
+        if (!departure || minutes === null || minutes <= 0) return false;
+        refs.arrival.value = toDatetimeLocal(new Date(departure.getTime() + minutes * 60000));
+        refs.durationHint.textContent = `已按 ${Math.floor(minutes / 60)} 小时 ${minutes % 60} 分钟计算到达时间`;
+        refs.durationHint.classList.remove('error');
+        return true;
+      }
+
+      function validateForm() {
+        const fields = [refs.departure, refs.duration, refs.arrival, refs.price, refs.airline, refs.baggage];
+        for (const field of fields) {
+          if (!field.checkValidity()) {
+            field.reportValidity();
+            field.focus();
+            return false;
+          }
+        }
+        const durationMinutes = parseDurationMinutes(refs.duration.value);
+        if (durationMinutes === null || durationMinutes <= 0) {
+          refs.durationHint.textContent = '请输入有效时长，例如 2h 30m 或 150m';
+          refs.durationHint.classList.add('error');
+          refs.duration.focus();
+          return false;
+        }
+        const dep = parseLocalDate(refs.departure.value);
+        const arr = parseLocalDate(refs.arrival.value);
+        if (dep && arr && arr <= dep) {
+          refs.arrival.setCustomValidity('到达时间必须晚于起飞时间');
+          refs.arrival.reportValidity();
+          refs.arrival.setCustomValidity('');
+          refs.arrival.focus();
+          return false;
+        }
+        return true;
+      }
+
+      function handleSubmit(event) {
+        event.preventDefault();
+        if (!validateForm()) return;
+
+        const id = refs.flightId.value;
+        const existing = flights.find(item => item.id === id);
+        const record = {
+          id: id || createId(),
+          departure: refs.departure.value,
+          duration: refs.duration.value.trim(),
+          arrival: refs.arrival.value,
+          price: Number(refs.price.value),
+          airline: refs.airline.value.trim(),
+          baggage: refs.baggage.value.trim(),
+          remarks: refs.remarks.value.trim(),
+          checked: existing?.checked || false,
+          highlight: existing?.highlight || null
+        };
+
+        if (existing) flights = flights.map(item => item.id === id ? record : item);
+        else flights.push(record);
+        saveFlights();
+        closeModal();
+        render();
+        showToast(existing ? '航班信息已更新' : '航班已添加');
+      }
+
+      function handleListClick(event) {
+        const actionElement = event.target.closest('[data-action]');
+        if (!actionElement) return;
+        const action = actionElement.dataset.action;
+        if (action === 'add') return openModal();
+        if (action === 'clear-filter') {
+          refs.filter.value = '';
+          refs.clearFilter.classList.remove('visible');
+          return render();
+        }
+        const card = actionElement.closest('.flight-card');
+        const flight = flights.find(item => item.id === card?.dataset.id);
+        if (!flight) return;
+
+        if (action === 'edit') openModal(flight);
+        if (action === 'delete') {
+          if (!window.confirm(`确定删除“${flight.airline}”吗？此操作无法撤销。`)) return;
+          flights = flights.filter(item => item.id !== flight.id);
+          saveFlights();
+          render();
+          showToast('航班记录已删除');
+        }
+        if (action === 'highlight') {
+          const color = actionElement.dataset.color;
+          flight.highlight = flight.highlight === color ? null : color;
+          saveFlights();
+          render();
+        }
+      }
+
+      function handleListChange(event) {
+        if (event.target.dataset.action !== 'check') return;
+        const card = event.target.closest('.flight-card');
+        const flight = flights.find(item => item.id === card?.dataset.id);
+        if (!flight) return;
+        flight.checked = event.target.checked;
+        saveFlights();
+        render();
+      }
+
+      refs.addBtn.addEventListener('click', () => openModal());
+      refs.closeModal.addEventListener('click', closeModal);
+      refs.cancelForm.addEventListener('click', closeModal);
+      refs.form.addEventListener('submit', handleSubmit);
+      refs.list.addEventListener('click', handleListClick);
+      refs.list.addEventListener('change', handleListChange);
+      refs.sort.addEventListener('change', render);
+      refs.filter.addEventListener('input', () => {
+        refs.clearFilter.classList.toggle('visible', Boolean(refs.filter.value));
+        render();
+      });
+      refs.clearFilter.addEventListener('click', () => {
+        refs.filter.value = '';
+        refs.clearFilter.classList.remove('visible');
+        refs.filter.focus();
+        render();
+      });
+      refs.compareBtn.addEventListener('click', () => {
+        if (flights.filter(item => item.checked).length < 2) return;
+        comparisonOpen = true;
+        render();
+        refs.comparePanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+      refs.closeCompare.addEventListener('click', () => {
+        comparisonOpen = false;
+        render();
+      });
+      refs.clearAllBtn.addEventListener('click', () => {
+        if (!flights.length) return;
+        if (!window.confirm(`确定清空全部 ${flights.length} 条航班记录吗？此操作无法撤销。`)) return;
+        flights = [];
+        comparisonOpen = false;
+        saveFlights();
+        render();
+        showToast('所有航班记录已清空');
+      });
+
+      refs.departure.addEventListener('input', () => calculateArrival());
+      refs.duration.addEventListener('input', () => {
+        refs.durationHint.textContent = '支持 2h30m、150m 或 2小时30分';
+        refs.durationHint.classList.remove('error');
+        calculateArrival();
+      });
+      refs.arrival.addEventListener('input', () => { arrivalManuallyEdited = true; });
+      refs.calcArrival.addEventListener('click', () => {
+        arrivalManuallyEdited = false;
+        if (!calculateArrival(true)) {
+          refs.durationHint.textContent = '请先填写有效的起飞时间和行程时长';
+          refs.durationHint.classList.add('error');
+        } else {
+          showToast('到达时间已重新计算');
+        }
+      });
+
+      refs.modal.addEventListener('click', event => {
+        if (event.target === refs.modal) closeModal();
+      });
+      document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && refs.modal.classList.contains('open')) closeModal();
+      });
+
+      render();
+    })();
+  </script>
+</body>
+</html>
